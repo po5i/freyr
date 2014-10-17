@@ -7,6 +7,12 @@ LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 const int VAL_PROBE = 0; // Analog pin 0
 const int led_feedback = 7;
 float MOISTURE_LEVEL = 50; // the value after the LED goes ON
+float threshold = 1;
+float MOISTURE = 0;
+int CHANGER = 0;
+float maxima = 90;
+float minima = 10;
+
  
 void setup() {
     Serial.begin(9600);
@@ -18,41 +24,55 @@ void LedState(int state) {
 }
  
 void loop() {
-    MOISTURE_LEVEL = analogRead(A5);
-    float moisture = analogRead(VAL_PROBE);
+    MOISTURE_LEVEL = analogRead(A5);  //potenciometro
+    MOISTURE = analogRead(VAL_PROBE);  //sensor
+    CHANGER = digitalRead(8);  //switch
+    
+    float lectura = (MOISTURE_LEVEL/1023)*100;
+    
+    if(CHANGER == 1){
+      if(lectura > (minima + threshold) && lectura < 100)
+        maxima = lectura;
+      
+    }
+    else{
+      if(lectura < (maxima - threshold) && lectura > 0)
+        minima = lectura;
+    }
+    
  
     //Serial.println(moisture);  //para processing
     
-    float deseada = (MOISTURE_LEVEL/1023)*100;
-    float actual = (moisture/1023)*100;
+    float actual = (MOISTURE/1023)*100;
     
     lcd.clear();
     
     lcd.begin(16, 2);
-    lcd.print("Deseada: ");
-    lcd.print(deseada);
+    lcd.print("MIN:");
+    lcd.print((int)minima);
     lcd.print("%");
     
+    lcd.print(" MAX:");
+    lcd.print((int)maxima);
+    lcd.print("%");
+    
+    
     lcd.setCursor(0, 1);
-    lcd.print("Actual:  ");
-    lcd.print(actual); 
+    lcd.print("ACTUAL:  ");
+    lcd.print((int)actual); 
     lcd.print("%");
     
     
  
-    if(moisture > MOISTURE_LEVEL) {
+    if(actual > maxima) {
         LedState(LOW);
         Serial.println(0);  //para processing
-        //lcd.clear();
-        //lcd.begin(16, 2);
-        //lcd.print("DESACTIVADO!");
         
-    } else   {
+        
+    } else if(actual < minima)   {
         LedState(HIGH);
         Serial.println(1);  //para processing
-        //lcd.clear();
-        //lcd.begin(16, 2);
-        //lcd.print("ACTIVADO!");
+        
     }
     delay(500);
 }

@@ -87,7 +87,7 @@ void draw(){
           
           if(enviar_notificacion){
             enviar_notificacion = false;
-            String mensaje = "Sistema de regado automatico ACTIVADO! - "+current_date;
+            String mensaje = "Tomando agua #sedienta - "+current_date;
             enviar_tweet(mensaje);
           }
         }
@@ -101,7 +101,7 @@ void draw(){
         //Notificar
         if(!enviar_notificacion){
             enviar_notificacion = true;
-            String mensaje = "Sistema de regado automatico DESACTIVADO! - "+current_date;
+            String mensaje = "Ya tome suficiente agua... #repleta xD "+current_date;
             enviar_tweet(mensaje);
           }
       }
