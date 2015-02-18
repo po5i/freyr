@@ -11,6 +11,10 @@ import processing.serial.*;
 import processing.video.*;
 import java.text.*;
 import java.util.Date;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.Map;
+
 import twitter4j.*;
 
 Capture cam;
@@ -25,46 +29,20 @@ static String OAuthConsumerSecret = "ag176KgFOipwJtMpl6725DzuzP0ujYiY8TcJ5p6FhWR
 static String AccessToken = "2690178402-jZhe3oVhaJ1mGUaocuitvWgP1bZ9Ls3IN9boMy6";
 static String AccessTokenSecret = "6w1LUJZjja85eSTcANlfkIrc35c1iaDOE9bEOfJxXoYO7";
 Twitter twitter = new TwitterFactory().getInstance();
+TwitterStream twitterStream = new TwitterStreamFactory().getInstance();
 String oldID = "";
 
-void enviar_tweet(String tweet){
-  try {   
-      //Query query = new Query("Guayaquil");
-      //QueryResult result = twitter.search(query);
-      //for (Status status : result.getTweets()) {
-      //    println("@" + status.getUser().getScreenName() + ":" + status.getText() + "("+status.getCreatedAt()+")");
-      //    println("");
-      //}
-      
-      // The factory instance is re-useable and thread safe.
-      Status status = twitter.updateStatus(tweet);
-      System.out.println("Successfully updated the status to [" + status.getText() + "].");
-      
-      //DirectMessage message = twitter.sendDirectMessage("CTIbot1", tweet);
-    }
-    catch (TwitterException te) {
-        println("Couldn't connect: " + te);
-    };
-}
+Boolean debug_no_arduino = true;
 
-void setup() {
-  size(640, 480);
-  cam = new Capture(this, width, height);
-  cam.start();
-  
-  // I know that the first port in the serial list on my mac
-  // is always my  FTDI adaptor, so I open Serial.list()[0].
-  // On Windows machines, this generally opens COM1.
-  // Open whatever port is the one you're using.
-  String portName = Serial.list()[0];
-  myPort = new Serial(this, portName, 9600);
-  loginTwitter();
-}
+
 
 void loginTwitter() {
   twitter.setOAuthConsumer(OAuthConsumerKey, OAuthConsumerSecret);
   AccessToken accessToken = loadAccessToken();
   twitter.setOAuthAccessToken(accessToken);
+  
+  twitterStream.setOAuthConsumer(OAuthConsumerKey, OAuthConsumerSecret);
+  twitterStream.setOAuthAccessToken(new AccessToken( AccessToken, AccessTokenSecret) );
 }
 
 private static AccessToken loadAccessToken() {
@@ -76,19 +54,53 @@ private static AccessToken loadAccessToken() {
 
 
 
-void draw(){
-  checkMoisture();
-  getMention();
-  delay(15000); // wait 15 seconds to avoid Twitter Rate Limit
+class SayHello extends TimerTask {
+    public void run() {
+       println(">>automatic action!!");
+       printStatus();
+       getMention();
+       delay(60000);
+    }
+ }
+
+/////////////////////////////////////////////////////////////////////////////////////
+
+void setup() {
+  size(640, 480);
+  cam = new Capture(this, width, height);
+  cam.start();
+  
+  // I know that the first port in the serial list on my mac
+  // is always my  FTDI adaptor, so I open Serial.list()[0].
+  // On Windows machines, this generally opens COM1.
+  // Open whatever port is the one you're using.
+  if(!debug_no_arduino){
+    String portName = Serial.list()[0];
+    myPort = new Serial(this, portName, 9600);
+  }
+  
+  loginTwitter();
+  Timer timer = new Timer();
+  timer.schedule(new SayHello(), 0, 10000);
 }
 
+void mousePressed() {
+  println(">>manual action!!");
+  printStatus();
+  getMention();
+}
+
+void draw(){  
+  checkMoisture();
+  //startListener();
+}
+
+/////////////////////////////////////////////////////////////////////////////////////
+
+
 void checkMoisture(){
-  DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
-  Date date = new Date();
-  String current_date = dateFormat.format(date);
-
-
-  if ( myPort.available() > 0) {  // If data is available,
+  
+  if (!debug_no_arduino && myPort.available() > 0) {  // If data is available,
     //val = myPort.read();         // read it and store it in val
     //readString += val; 
     String inString = myPort.readStringUntil('\n');
@@ -109,8 +121,8 @@ void checkMoisture(){
           
           if(enviar_notificacion){
             enviar_notificacion = false;
-            String mensaje = "Tomando agua #sedienta - "+current_date;
-            enviar_tweet(mensaje);
+            String mensaje = "Tomando agua #sedienta";
+            enviarTweet(mensaje);
           }
         }
       }
@@ -121,8 +133,8 @@ void checkMoisture(){
         //Notificar
         if(!enviar_notificacion){
             enviar_notificacion = true;
-            String mensaje = "Ya tome suficiente agua... #repleta xD "+current_date;
-            enviar_tweet(mensaje);
+            String mensaje = "Ya tome suficiente agua... #repleta xD";
+            enviarTweet(mensaje);
           }
       }
     }
@@ -130,7 +142,7 @@ void checkMoisture(){
 }
 
 float readMoisture(){
-  if ( myPort.available() > 0) {  // If data is available,
+  if (!debug_no_arduino && myPort.available() > 0) {  // If data is available,
     //val = myPort.read();         // read it and store it in val
     //readString += val; 
     String inString = myPort.readStringUntil('\n');
@@ -149,6 +161,7 @@ float readMoisture(){
 
 //http://www.instructables.com/id/Twitter-Mention-Mood-Light/?ALLSTEPS
 void getMention() {
+  println("get mention()");
   ResponseList mentions = null;
   try {
     mentions = twitter.getMentionsTimeline();
@@ -166,7 +179,7 @@ void getMention() {
     if(status.getText().equals("@freyr_bot estado")){
       Float humedad = readMoisture();    //TODO: hacer que el arduino retorne el valor de la humedad y el estado de la bomba
       String mensaje = "La humedad de la tierra es "+humedad;
-      enviar_tweet(mensaje);
+      enviarTweet(mensaje);
     }
     else if(status.getText().equals("@freyr_bot selfie")){
       if(cam.available()) {
@@ -178,16 +191,57 @@ void getMention() {
         tweetPic(file, "#selfie");
     }
     else{
-      enviar_tweet("Los comandos son: estado, selfie");
+      enviarTweet("Los comandos son: estado, selfie");
     }
   }
 }
 
 
+/*void startListener(){
+  StatusListener listener = new StatusListener() {
+      @Override
+      public void onStatus(Status status) {
+          System.out.println("@" + status.getUser().getScreenName() + " - " + status.getText());
+      }
+
+      @Override
+      public void onDeletionNotice(StatusDeletionNotice statusDeletionNotice) {
+          System.out.println("Got a status deletion notice id:" + statusDeletionNotice.getStatusId());
+      }
+
+      @Override
+      public void onTrackLimitationNotice(int numberOfLimitedStatuses) {
+          System.out.println("Got track limitation notice:" + numberOfLimitedStatuses);
+      }
+
+      @Override
+      public void onScrubGeo(long userId, long upToStatusId) {
+          System.out.println("Got scrub_geo event userId:" + userId + " upToStatusId:" + upToStatusId);
+      }
+
+      @Override
+      public void onStallWarning(StallWarning warning) {
+          System.out.println("Got stall warning:" + warning);
+      }
+
+      @Override
+      public void onException(Exception ex) {
+          ex.printStackTrace();
+      }
+  };
+  twitterStream.addListener(listener);
+  twitterStream.sample();
+}*/
+
+
 //http://forum.processing.org/two/discussion/2897/tweeting-a-photo-with-twitter4j-how-solved
 void tweetPic(File _file, String theTweet){
+  DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+  Date date = new Date();
+  String current_date = dateFormat.format(date);
+
   try{
-       StatusUpdate status = new StatusUpdate(theTweet);
+       StatusUpdate status = new StatusUpdate(theTweet+"|"+current_date);
        status.setMedia(_file);
        twitter.updateStatus(status);
        System.out.println("Successfully updated the status to [" + theTweet + "].");
@@ -195,5 +249,54 @@ void tweetPic(File _file, String theTweet){
     catch (TwitterException te){
         println("Error: "+ te.getMessage()); 
     }
+}
+
+void enviarTweet(String tweet){
+  DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+  Date date = new Date();
+  String current_date = dateFormat.format(date);
+
+
+  try {   
+      //Query query = new Query("Guayaquil");
+      //QueryResult result = twitter.search(query);
+      //for (Status status : result.getTweets()) {
+      //    println("@" + status.getUser().getScreenName() + ":" + status.getText() + "("+status.getCreatedAt()+")");
+      //    println("");
+      //}
+      
+      // The factory instance is re-useable and thread safe.
+      Status status = twitter.updateStatus(tweet+"|"+current_date);
+      System.out.println("Successfully updated the status to [" + status.getText() + "].");
+      
+      //DirectMessage message = twitter.sendDirectMessage("CTIbot1", tweet);
+    }
+    catch (TwitterException te) {
+        println("Couldn't connect: " + te);
+    };
+}
+
+
+void printStatus(){
+  try {
+      System.out.println("=======================================");
+      //Twitter twitter = new TwitterFactory().getInstance();
+      Map<String ,RateLimitStatus> rateLimitStatus = twitter.getRateLimitStatus();
+      for (String endpoint : rateLimitStatus.keySet()) {
+        RateLimitStatus status = rateLimitStatus.get(endpoint);
+        if(status.getLimit() != status.getRemaining()){          
+          System.out.println("Endpoint: " + endpoint);
+          System.out.println(" Limit: " + status.getLimit());
+          System.out.println(" Remaining: " + status.getRemaining());
+          System.out.println(" ResetTimeInSeconds: " + status.getResetTimeInSeconds());
+          System.out.println(" SecondsUntilReset: " + status.getSecondsUntilReset());
+        }
+      }
+      System.out.println("=======================================");
+  } catch (TwitterException te) {
+      te.printStackTrace();
+      System.out.println("Failed to get rate limit status: " + te.getMessage());
+      System.exit(-1);
+  }
 }
 
