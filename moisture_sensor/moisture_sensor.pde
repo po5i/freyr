@@ -33,6 +33,7 @@ TwitterStream twitterStream = new TwitterStreamFactory().getInstance();
 String oldID = "";
 
 Boolean debug_no_arduino = true;
+Date start_run_date;
 
 
 
@@ -69,6 +70,8 @@ void setup() {
   size(640, 480);
   cam = new Capture(this, width, height);
   cam.start();
+  
+  start_run_date = new Date();
   
   // I know that the first port in the serial list on my mac
   // is always my  FTDI adaptor, so I open Serial.list()[0].
@@ -161,7 +164,6 @@ float readMoisture(){
 
 //http://www.instructables.com/id/Twitter-Mention-Mood-Light/?ALLSTEPS
 void getMention() {
-  println("get mention()");
   ResponseList mentions = null;
   try {
     mentions = twitter.getMentionsTimeline();
@@ -173,15 +175,21 @@ void getMention() {
   String newID = str(status.getId());
   if (oldID.equals(newID) == false){
     oldID = newID;
+    
+    if(status.getCreatedAt().compareTo(start_run_date) < 0){
+      println("el comando pertenece al pasado");
+      return;
+    }
+    
     println(status.getText()+", by @"+status.getUser().getScreenName());
     
-    //TODO: el problema con los estados es que twitter no permite al usuario enviar el mismo tweet dos veces. 
-    if(status.getText().equals("@freyr_bot estado")){
+    //procesar comandos
+    if(status.getText().contains("@freyr_bot estado")){
       Float humedad = readMoisture();    //TODO: hacer que el arduino retorne el valor de la humedad y el estado de la bomba
       String mensaje = "La humedad de la tierra es "+humedad;
       enviarTweet(mensaje);
     }
-    else if(status.getText().equals("@freyr_bot selfie")){
+    else if(status.getText().contains("@freyr_bot selfie")){
       if(cam.available()) {
           cam.read();
         }
