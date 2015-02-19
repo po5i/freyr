@@ -62,16 +62,33 @@ void loop() {
     lcd.print((int)actual); 
     lcd.print("%");
     
+    char buf[10];
     
      //TODO: debe retornar el estado de la bomba y el valor de la humedad concatenados.
     if(actual > maxima) {
         LedState(LOW);
-        Serial.println(0);  //para processing
+        Serial.print(0);
+        Serial.print(",");
+        Serial.print(minima);
+        Serial.print(",");
+        Serial.print(maxima);
+        Serial.print(",");
+        Serial.println(actual);  //para processing
         
         
     } else if(actual < minima)   {
         LedState(HIGH);
-        Serial.println(1);  //para processing
+        Serial.print(1);
+        Serial.print(",");
+        Serial.print(minima);
+        Serial.print(",");
+        Serial.print(maxima);
+        Serial.print(",");
+        Serial.println(actual);  //para processing
+        
+        delay(1000);
+        LedState(LOW);
+        delay(1000);
         
         //TODO : activar la bomba intermitentemete y con delay 
         //para evitar inundación

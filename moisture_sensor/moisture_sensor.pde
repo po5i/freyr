@@ -17,12 +17,19 @@ import java.util.Map;
 
 import twitter4j.*;
 
+Boolean debug_no_arduino = false;    //FALSE si esta conectado al arduino, TRUE para pruebas locales
+
 Capture cam;
 Serial myPort;  // Create object from Serial class
 int val;      // Data received from the serial port
 int dry = 50;
-Boolean activar_bomba = false;
+int activar_bomba;
 Boolean enviar_notificacion = true;
+float moisture;
+float minima;
+float maxima;
+Date start_run_date;
+String oldID = "";
 
 static String OAuthConsumerKey = "KcnnOrCgBi8jUV6YG5f6zqv0d";
 static String OAuthConsumerSecret = "ag176KgFOipwJtMpl6725DzuzP0ujYiY8TcJ5p6FhWRxvUzLQh";
@@ -30,10 +37,9 @@ static String AccessToken = "2690178402-jZhe3oVhaJ1mGUaocuitvWgP1bZ9Ls3IN9boMy6"
 static String AccessTokenSecret = "6w1LUJZjja85eSTcANlfkIrc35c1iaDOE9bEOfJxXoYO7";
 Twitter twitter = new TwitterFactory().getInstance();
 TwitterStream twitterStream = new TwitterStreamFactory().getInstance();
-String oldID = "";
 
-Boolean debug_no_arduino = true;
-Date start_run_date;
+
+
 
 
 
@@ -95,7 +101,6 @@ void mousePressed() {
 
 void draw(){  
   checkMoisture();
-  //startListener();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////
@@ -113,25 +118,27 @@ void checkMoisture(){
       inString = trim(inString);
       //println(inString);  //debug
       
-      float moisture = Float.parseFloat(inString);
+      //procesar inString: estado-bomba,minimo,maximo,actual 
+      String[] arduino_outputs = inString.split(",");
+      moisture = Float.parseFloat(arduino_outputs[3]);
+      maxima = Float.parseFloat(arduino_outputs[2]);
+      minima = Float.parseFloat(arduino_outputs[1]);
+      activar_bomba = Integer.parseInt(arduino_outputs[0]);
       //println(moisture);
       
       if(moisture > 0){
-        //notification for tweeter
-        //activar sistema
-        if(!activar_bomba){
-          activar_bomba = true;
-          
-          if(enviar_notificacion){
-            enviar_notificacion = false;
-            String mensaje = "Tomando agua #sedienta";
-            enviarTweet(mensaje);
-          }
+        //activado sistema
+       
+        //Notificar
+        if(enviar_notificacion){
+          enviar_notificacion = false;
+          String mensaje = "Tomando agua #sedienta";
+          enviarTweet(mensaje);
         }
+        
       }
       else{
-        //Desactivar bomba
-        activar_bomba = false;
+        //Desactivado sistema
         
         //Notificar
         if(!enviar_notificacion){
@@ -144,23 +151,10 @@ void checkMoisture(){
   }
 }
 
-float readMoisture(){
-  if (!debug_no_arduino && myPort.available() > 0) {  // If data is available,
-    //val = myPort.read();         // read it and store it in val
-    //readString += val; 
-    String inString = myPort.readStringUntil('\n');
- 
-    if (inString != null && !inString.equals("")) {
-      // trim off any whitespace:
-      inString = trim(inString);
-      //println(inString);  //debug
-      
-      float moisture = Float.parseFloat(inString);
-      return(moisture);
-    }
-  }
-  return 0;
-}
+
+
+
+
 
 //http://www.instructables.com/id/Twitter-Mention-Mood-Light/?ALLSTEPS
 void getMention() {
@@ -185,8 +179,7 @@ void getMention() {
     
     //procesar comandos
     if(status.getText().contains("@freyr_bot estado")){
-      Float humedad = readMoisture();    //TODO: hacer que el arduino retorne el valor de la humedad y el estado de la bomba
-      String mensaje = "La humedad de la tierra es "+humedad;
+      String mensaje = "La humedad de la tierra es "+moisture+", Rango de humedad entre "+minima+"% a "+maxima+"%.";
       enviarTweet(mensaje);
     }
     else if(status.getText().contains("@freyr_bot selfie")){
@@ -205,41 +198,9 @@ void getMention() {
 }
 
 
-/*void startListener(){
-  StatusListener listener = new StatusListener() {
-      @Override
-      public void onStatus(Status status) {
-          System.out.println("@" + status.getUser().getScreenName() + " - " + status.getText());
-      }
 
-      @Override
-      public void onDeletionNotice(StatusDeletionNotice statusDeletionNotice) {
-          System.out.println("Got a status deletion notice id:" + statusDeletionNotice.getStatusId());
-      }
 
-      @Override
-      public void onTrackLimitationNotice(int numberOfLimitedStatuses) {
-          System.out.println("Got track limitation notice:" + numberOfLimitedStatuses);
-      }
-
-      @Override
-      public void onScrubGeo(long userId, long upToStatusId) {
-          System.out.println("Got scrub_geo event userId:" + userId + " upToStatusId:" + upToStatusId);
-      }
-
-      @Override
-      public void onStallWarning(StallWarning warning) {
-          System.out.println("Got stall warning:" + warning);
-      }
-
-      @Override
-      public void onException(Exception ex) {
-          ex.printStackTrace();
-      }
-  };
-  twitterStream.addListener(listener);
-  twitterStream.sample();
-}*/
+/////////////////////////////////////////////////////////////////////////////////////
 
 
 //http://forum.processing.org/two/discussion/2897/tweeting-a-photo-with-twitter4j-how-solved
